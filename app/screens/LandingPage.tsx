@@ -33,6 +33,7 @@ const LandingScreen = ({ route }) => {
 
       let usedWord: string | null = null;
       let usedDef: string | null = null;
+      let maybeId: number | null = null;
 
       try {
         const res = await fetch(backendUrl);
@@ -43,20 +44,23 @@ const LandingScreen = ({ route }) => {
           usedWord = picked.word || picked.wordText || picked.name || null;
           usedDef = picked.definition || picked.def || null;
           const maybeId = picked.id ?? picked.wordId ?? picked.word_id ?? picked._id ?? null;
-          setDailyWordId(maybeId);
         }
       } catch (backendErr) {
         console.warn("Backend fetch failed, falling back to local list:", backendErr);
       }
 
-      if (!usedDef) usedDef = "Definition not available.";
+      if (!usedWord) usedWord = "Lucid";          // fallback word
+      if (!usedDef) usedDef = "Clear and easy to understand."; // fallback definition
+      if (!maybeId) maybeId = 2;                  // fallback ID
 
       setDailyWord(usedWord);
       setDefinition(usedDef);
+      setDailyWordId(maybeId);
     } catch (error) {
       console.error("Error fetching daily word:", error);
       setDailyWord("No word available");
       setDefinition("Definition not available.");
+      setDailyWordId(2); // fallback ID
     } finally {
       setLoading(false);
     }
