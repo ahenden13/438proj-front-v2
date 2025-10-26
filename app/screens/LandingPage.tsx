@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, Button } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, Button, Alert } from "react-native";
 import wordList from "../../assets/advanced_words.json";
 import { useNavigation } from "@react-navigation/native";
 import { useSQLiteContext } from "expo-sqlite";
@@ -104,6 +104,39 @@ const LandingScreen = ({ route }) => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to permanently delete your account?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await fetch(`https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/users/${userID}`, {
+                method: "DELETE",
+              });
+
+              if (res.status === 204) {
+                Alert.alert("Account Deleted", "Your account has been successfully deleted.");
+                navigation.navigate("LoginPage");
+              } else if (res.status === 404) {
+                Alert.alert("Error", "User not found on server.");
+              } else {
+                const msg = await res.text();
+                throw new Error(msg || "Failed to delete account");
+              }
+            } catch (error) {
+              Alert.alert("Error", error.message || "An unknown error occurred.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ImageBackground
       source={require("../../assets/images/LP_background.png")}
@@ -155,6 +188,10 @@ const LandingScreen = ({ route }) => {
           onPress={() => navigation.navigate("VocabListPage", { userID, vocabHistoryID })}
         >
           <Text style={styles.vocabListText}>🚀 View Vocab Lists</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
+          <Text style={styles.deleteText}>🗑️ Delete Account</Text>
         </TouchableOpacity>
 
       </View>
@@ -272,7 +309,14 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#222222",
     marginBottom: 10,
-  }
+  },
+  deleteButton: {
+    backgroundColor: "#b71c1c",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  deleteText: { color: "white", fontWeight: "bold" },
 });
 
 export default LandingScreen;
