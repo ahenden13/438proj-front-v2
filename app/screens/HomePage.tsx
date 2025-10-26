@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Button, ImageBackground } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
@@ -6,6 +6,10 @@ import { useNavigation } from "@react-navigation/native";
 export default function HomePage() {
   const router = useRouter();
   const navigation = useNavigation();
+
+  useEffect(() => {
+    console.log("running");
+  }, []);
 
   return (
     <ImageBackground

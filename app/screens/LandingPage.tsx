@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, Button } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, Button, Alert, Modal, TextInput } from "react-native";
 import wordList from "../../assets/advanced_words.json";
 import { useNavigation } from "@react-navigation/native";
 import { useSQLiteContext } from "expo-sqlite";
@@ -13,8 +13,13 @@ const LandingScreen = ({ route }) => {
   const navigation = useNavigation();
   const { userID } = route.params;
   const db = useSQLiteContext();
+  const [username, setUsername] = useState("")
+    const [editVisible, setEditVisible] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+
 
   useEffect(() => {
+    getUsername();
     fetchDailyWord();
     getVocabHistoryID();
   }, []);
@@ -86,12 +91,96 @@ const LandingScreen = ({ route }) => {
     }
   };
 
+  const getUsername = async () => {
+    try {
+      const response = await fetch("https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/users/" + userID);
+      if (!response.ok) throw new Error("Failed to fetch user from server");
+      const user = await response.json();
+      if (user) {
+        setUsername(user.username);
+        console.log("Logged in as:", username);
+      } else {
+        console.log("User not found");
+      }
+    } catch (error) {
+      console.error("Error fetching username:", error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to permanently delete your account?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await fetch(`https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/users/${userID}`, {
+                method: "DELETE",
+              });
+
+              if (res.status === 204) {
+                Alert.alert("Account Deleted", "Your account has been successfully deleted.");
+                navigation.navigate("LoginPage");
+              } else if (res.status === 404) {
+                Alert.alert("Error", "User not found on server.");
+              } else {
+                const msg = await res.text();
+                throw new Error(msg || "Failed to delete account");
+              }
+            } catch (error) {
+              Alert.alert("Error", error.message || "An unknown error occurred.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUpdateUsername = async () => {
+    if (!newUsername.trim()) {
+      Alert.alert("Error", "Username cannot be empty.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/users/${userID}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oauthProvider: "local",
+          oauthProvId: "none",
+          username: newUsername.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || "Failed to update username");
+      }
+
+      const updatedUser = await res.json();
+      setUsername(updatedUser.username);
+      setEditVisible(false);
+      Alert.alert("Success", "Username updated successfully!");
+    } catch (err) {
+      Alert.alert("Error", err.message);
+    }
+  };
+
+
   return (
     <ImageBackground
       source={require("../../assets/images/LP_background.png")}
       style={styles.background}
     >
       <View style={styles.overlay}>
+
+        <Text style={styles.welcomeText}>Welcome, {username}!</Text>
+
         <TouchableOpacity style={styles.logoutButton} onPress={() => navigation.navigate("HomePage")}>
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
@@ -134,6 +223,37 @@ const LandingScreen = ({ route }) => {
           onPress={() => navigation.navigate("VocabListPage", { userID, vocabHistoryID })}
         >
           <Text style={styles.vocabListText}>🚀 View Vocab Lists</Text>
+        </TouchableOpacity>
+
+        <Modal visible={editVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Edit Username</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter new username"
+                value={newUsername}
+                onChangeText={setNewUsername}
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity onPress={() => setEditVisible(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleUpdateUsername}>
+                  <Text style={styles.saveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ✏️ Edit Username Button */}
+        <TouchableOpacity style={styles.editButton} onPress={() => setEditVisible(true)}>
+          <Text style={styles.editText}>✏️ Edit Username</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
+          <Text style={styles.deleteText}>🗑️ Delete Account</Text>
         </TouchableOpacity>
 
       </View>
@@ -246,6 +366,55 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#222222",
+    marginBottom: 10,
+  },
+  deleteButton: {
+    backgroundColor: "#b71c1c",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  deleteText: { color: "white", fontWeight: "bold" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
+  modalInput: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 15,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cancelText: { color: "#888", fontSize: 16 },
+  saveText: { color: "#4A90E2", fontSize: 16, fontWeight: "bold" },
+  editButton: {
+    backgroundColor: "#4A90E2",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  editText: { color: "white", fontWeight: "bold" }
 });
 
 export default LandingScreen;
