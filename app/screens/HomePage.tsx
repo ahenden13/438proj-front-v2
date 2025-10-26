@@ -8,7 +8,9 @@ export default function HomePage() {
   const router = useRouter();
   const navigation = useNavigation();
 
-  
+  useEffect(() => {
+    console.log("running");
+  }, []);
 
   return (
     <ImageBackground

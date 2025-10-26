@@ -6,60 +6,40 @@ import { useSQLiteContext } from "expo-sqlite";
 export default function CreateAccount() {
   const db = useSQLiteContext();
   const navigation = useNavigation();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [securityQuestion, setSecurityQuestion] = useState("");
-  const [securityAnswer, setSecurityAnswer] = useState("");
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
     navigation.setOptions({ headerBackTitle: "Back" });
-    checkAndUpdateDatabase();
   }, [navigation]);
 
-  // check and update database
-  const checkAndUpdateDatabase = async () => {
-    try {
-      const result = await db.getAllAsync("PRAGMA table_info(users);"); // ensure to return the list
-      if (!Array.isArray(result)) {
-        console.error("Error: Unexpected database response", result);
-        return;
-      }
-
-      console.log("Database columns:", result); // make record and return data
-
-      const columns = result.map((col) => col.name);
-
-      if (!columns.includes("securityQuestion")) {
-        await db.runAsync("ALTER TABLE users ADD COLUMN securityQuestion TEXT;");
-      }
-      if (!columns.includes("securityAnswer")) {
-        await db.runAsync("ALTER TABLE users ADD COLUMN securityAnswer TEXT;");
-      }
-    } catch (error) {
-      console.error("Error updating database:", error);
-    }
-  };
 
   const handleSignUp = async () => {
     try {
-      if (!email || !password || !securityQuestion || !securityAnswer) {
-        Alert.alert("Error", "All fields are required.");
+      if (!username.trim()) {
+        Alert.alert("Error", "Username is required.");
         return;
       }
 
-      const existingUser = await db.getFirstAsync("SELECT * FROM users WHERE email = ?", [email]);
-      if (existingUser) {
-        Alert.alert("Error", "This email is already registered.");
-        return;
+      const newUser = {
+        oauthProvider: "local",
+        oauthProvId: "none",
+        username: username.trim(),
+      };
+      const response = await fetch("https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUser),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Signup failed");
       }
 
-      await db.runAsync(
-        "INSERT INTO users (email, password, securityQuestion, securityAnswer) VALUES (?, ?, ?, ?)",
-        [email, password, securityQuestion, securityAnswer]
-      );
+      const createdUser = await response.json();
+      console.log("User created:", createdUser);
 
-      const result = await db.getFirstAsync("SELECT last_insert_rowid() AS lastID");
-      const newUserID = result.lastID;
+      const newUserID = createdUser.userId;
       await db.runAsync("INSERT INTO vocabLists (userID, listName) VALUES (?, ?)", [newUserID, "Vocab Word History"]);
 
       Alert.alert("Sign Up Successful", "You can now log in.");
@@ -73,10 +53,7 @@ export default function CreateAccount() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
-      <TextInput style={styles.input} placeholder="User Name" value={email} onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
-      <TextInput style={styles.input} placeholder="Security Question" value={securityQuestion} onChangeText={setSecurityQuestion} />
-      <TextInput style={styles.input} placeholder="Answer to Security Question" value={securityAnswer} onChangeText={setSecurityAnswer} />
+      <TextInput style={styles.input} placeholder="User Name" value={username} onChangeText={setUsername} />
       <Button title="Sign Up" onPress={handleSignUp} color="#FF5733" />
     </View>
   );
