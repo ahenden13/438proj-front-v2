@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Button, ImageBackground } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
@@ -6,6 +6,27 @@ import { useNavigation } from "@react-navigation/native";
 export default function HomePage() {
   const router = useRouter();
   const navigation = useNavigation();
+
+  const fetchAllWords = async () => {
+    try {
+    const response = await fetch('https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/words');
+    const text = await response.text();
+    console.log("Raw response text:", `"${text}"`);
+    // if (!text) {
+    //   console.warn("Backend returned empty response");
+    //   return;
+    // }
+    const data = JSON.parse(text);
+    console.log("Parsed data:", data);
+  } catch (error) {
+    console.error("Error fetching words:", error);
+  }
+  };
+
+  useEffect(() => {
+    console.log("running")
+    fetchAllWords();
+  }, []);
 
   return (
     <ImageBackground

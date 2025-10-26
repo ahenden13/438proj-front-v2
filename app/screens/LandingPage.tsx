@@ -13,8 +13,10 @@ const LandingScreen = ({ route }) => {
   const navigation = useNavigation();
   const { userID } = route.params;
   const db = useSQLiteContext();
+  const [username, setUsername] = useState("")
 
   useEffect(() => {
+    getUsername();
     fetchDailyWord();
     getVocabHistoryID();
   }, []);
@@ -86,12 +88,31 @@ const LandingScreen = ({ route }) => {
     }
   };
 
+  const getUsername = async () => {
+    try {
+      const response = await fetch("https://vocabapp-group5-04a1e4402b45.herokuapp.com/api/users/" + userID);
+      if (!response.ok) throw new Error("Failed to fetch user from server");
+      const user = await response.json();
+      if (user) {
+        setUsername(user.username);
+        console.log("Logged in as:", username);
+      } else {
+        console.log("User not found");
+      }
+    } catch (error) {
+      console.error("Error fetching username:", error);
+    }
+  };
+
   return (
     <ImageBackground
       source={require("../../assets/images/LP_background.png")}
       style={styles.background}
     >
       <View style={styles.overlay}>
+
+        <Text style={styles.welcomeText}>Welcome, {username}!</Text>
+
         <TouchableOpacity style={styles.logoutButton} onPress={() => navigation.navigate("HomePage")}>
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
@@ -246,6 +267,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#222222",
+    marginBottom: 10,
+  }
 });
 
 export default LandingScreen;
