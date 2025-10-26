@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Button, ImageBackground } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 
+
 export default function HomePage() {
   const router = useRouter();
   const navigation = useNavigation();

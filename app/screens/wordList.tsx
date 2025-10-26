@@ -4,12 +4,13 @@ import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 import { useSQLiteContext } from "expo-sqlite";
 import { useNavigation } from "@react-navigation/native";
 
-const WordListPage = ({ route }) => {
+const WordListPage = ({ route }: any) => {
+  const BASE_URL = "https://vocabapp-group5-04a1e4402b45.herokuapp.com";
   const [loading, setLoading] = useState(true);
   const [listName, setListName] = useState<string | null>(null);
-  const [wordList, setWordList] = useState([]);
-  const navigation = useNavigation();
-  const { userID, listID } = route.params;
+  const [wordList, setWordList] = useState<any[]>([]);
+  const navigation: any = useNavigation();
+  const { userID, listID } = (route?.params ?? {}) as any;
   const db = useSQLiteContext();
 
   useEffect(() => {
@@ -22,11 +23,39 @@ const WordListPage = ({ route }) => {
     try {
       // Debugging
       // console.log(`UserID: ${userID} and ListID: ${listID}`);
-      const existingList = await db.getFirstAsync("SELECT * FROM vocabLists WHERE userID = ? AND listID = ?", [userID, listID]);
-      setListName(existingList.listName);
+  const existingList: any = await db.getFirstAsync("SELECT * FROM vocabLists WHERE userID = ? AND listID = ?", [userID, listID]);
+  setListName(existingList?.listName ?? null);
+      if (existingList.listName && existingList.listName.toLowerCase().includes("history")) {
+        try {
+          const res = await fetch(`${BASE_URL}/api/users/${userID}/words`);
+          if (res.ok) {
+            const remote: any[] = await res.json();
+            const mapped = remote.map((uw) => {
+              const w = uw.word || {};
+              const wordText = w.word || w.wordText || w.name || uw.wordText || "";
+              const definition = w.definition || w.def || uw.definition || "";
+              return {
+                userWordId: uw.userWordId ?? uw.user_word_id ?? uw.id ?? null,
+                wordID: w.wordID ?? w.id ?? w.wordId ?? null,
+                word: wordText,
+                definition,
+                status: uw.status,
+                timesReviewed: uw.timesReviewed,
+                lastReviewed: uw.lastReviewed,
+              };
+            });
+            setWordList(mapped);
+            return;
+          } else {
+            console.warn("Remote history fetch returned non-OK status", res.status);
+          }
+        } catch (err) {
+          console.warn("Remote history fetch failed, falling back to local DB:", err);
+        }
+      }
 
-      const vocabWords = await db.getAllAsync("SELECT * FROM wordInList WHERE userID = ? AND listID = ?", [userID, `${listID}`]);
-      setWordList(vocabWords);
+  const vocabWords: any[] = await db.getAllAsync("SELECT * FROM wordInList WHERE userID = ? AND listID = ?", [userID, `${listID}`]);
+  setWordList(vocabWords);
       // console.log("Vocab Words:", vocabWords); // Debugging Purposes
     } catch (error) {
       console.error("Error loading vocab words:", error);
@@ -61,7 +90,7 @@ const WordListPage = ({ route }) => {
                 <Text style={styles.definition}>{item.definition}</Text>
               </View>
             )}
-            keyExtractor={(item) => item.wordID.toString()}
+            keyExtractor={(item) => (item.userWordId ?? item.wordID ?? item.wordId ?? item.id ?? item.word ?? Math.random()).toString()}
           />
         )}
       </SafeAreaView>
