@@ -10,9 +10,11 @@ const LandingScreen = ({ route }) => {
   const [definition, setDefinition] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [vocabHistoryID, setVocabHistoryID] = useState<number | null>(null);
-  const navigation = useNavigation();
+  const navigation: any = useNavigation();
   const { userID } = route.params;
   const db = useSQLiteContext();
+  const BASE_URL = "https://vocabapp-group5-04a1e4402b45.herokuapp.com";
+  const [dailyWordId, setDailyWordId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchDailyWord();
@@ -22,20 +24,30 @@ const LandingScreen = ({ route }) => {
   const fetchDailyWord = async () => {
     setLoading(true);
     try {
-      const randomWord = wordList[Math.floor(Math.random() * wordList.length)];
-      const API_KEY = "9c3b1721-9b03-4686-954c-91e9137bf51a";
-      const API_URL = `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${randomWord}?key=${API_KEY}`;
-      const response = await fetch(API_URL);
+  const backendUrl = `${BASE_URL}/api/words`;
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch definition for ${randomWord}`);
+      let usedWord: string | null = null;
+      let usedDef: string | null = null;
+
+      try {
+        const res = await fetch(backendUrl);
+        if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+        const words = await res.json();
+        if (Array.isArray(words) && words.length > 0) {
+          const picked = words[Math.floor(Math.random() * words.length)];
+          usedWord = picked.word || picked.wordText || picked.name || null;
+          usedDef = picked.definition || picked.def || null;
+          const maybeId = picked.id ?? picked.wordId ?? picked.word_id ?? picked._id ?? null;
+          setDailyWordId(maybeId);
+        }
+      } catch (backendErr) {
+        console.warn("Backend fetch failed, falling back to local list:", backendErr);
       }
 
-      const data = await response.json();
-      const fetchedDefinition = data[0]?.shortdef?.[0] || "Definition not available.";
+      if (!usedDef) usedDef = "Definition not available.";
 
-      setDailyWord(randomWord);
-      setDefinition(fetchedDefinition);
+      setDailyWord(usedWord);
+      setDefinition(usedDef);
     } catch (error) {
       console.error("Error fetching daily word:", error);
       setDailyWord("No word available");
@@ -46,44 +58,38 @@ const LandingScreen = ({ route }) => {
   };
 
   const getVocabHistoryID = async () => {
-    // gets the listID of the vocab history list
-    const vocabHistoryID = await db.getFirstAsync("SELECT listID FROM vocabLists WHERE userID = ? ORDER BY listID ASC LIMIT 1", [userID]);
-    // console.log("User Vocab History ID: ", vocabHistoryID.listID); // Debugging
-    setVocabHistoryID(vocabHistoryID.listID);
+    const row: any = await db.getFirstAsync("SELECT listID FROM vocabLists WHERE userID = ? ORDER BY listID ASC LIMIT 1", [userID]);
+    if (row && row.listID != null) setVocabHistoryID(row.listID);
   }
 
   // Might need to add a limit to how many words can be saved to history
   const saveWordToHistory = async () => {
-    if (dailyWord && definition) {
-      try {
-        const existingWord = await db.getFirstAsync(
-          "SELECT * FROM wordInList WHERE userID = ? AND listID = ? AND word = ?",
-          [userID, vocabHistoryID, dailyWord]
-        );
+    if (!dailyWord || !definition) return;
 
-        if (existingWord) {
-          console.log(`⚠️ Word '${dailyWord}' already exists in history.`);
-          alert("This word is already in your history!");
+    try {
+      if (dailyWordId != null) {
+        const url = `${BASE_URL}/api/users/${userID}/words`;
+        const payload = { wordId: dailyWordId, status: "not started" };
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          console.log(`✅ Saved '${dailyWord}' to remote history (user ${userID}).`);
+          alert("Word saved to history (remote)!");
           return;
-        }
-
-        const response = await db.runAsync(
-          "INSERT INTO wordInList (listID, userID, word, definition) VALUES (?, ?, ?, ?)",
-          [vocabHistoryID, userID, dailyWord, definition]
-        );
-
-        if (response && response.changes > 0) { // Check if changes were made
-          console.log("Insertion successful!");
         } else {
-          console.log("Insertion failed");
+          console.warn("Remote save returned non-OK status", res.status);
         }
-
-        console.log(`✅ Saved '${dailyWord}' to vocabHistory`);
-        alert("Word saved to history!");
-      } catch (error) {
-        console.error("🚨 Error saving word:", error);
+      } else {
+        console.warn("No remote word id available, skipping remote save.");
       }
+    } catch (err) {
+      console.warn("Remote save failed, falling back to local DB:", err);
     }
+
   };
 
   return (
@@ -119,21 +125,11 @@ const LandingScreen = ({ route }) => {
         </TouchableOpacity>
 
         {/*  Need to create custom style for button (Currently using Save Button Style) */}
-        <TouchableOpacity style={styles.saveButton} onPress={() => navigation.navigate("PickList", { userID, vocabHistoryID, dailyWord, definition })} accessibilityLabel="Save Word to Vocab List">
-          <Text style={styles.refreshButtonText}>✅ Save to Existing Vocab List</Text>
-        </TouchableOpacity>
-
-        {/*  Need to create custom style for button (Currently using Save Button Style) */}
-        <TouchableOpacity style={styles.createListButton} onPress={() => navigation.navigate("ListCreation", { userID })} accessibilityLabel="Create New List">
-          <Text style={styles.createListText}>✨ Create New List</Text>
-        </TouchableOpacity>
-
-        {/*  Need to create custom style for button (Currently using Save Button Style) */}
         <TouchableOpacity
           style={styles.vocabListButton}
           onPress={() => navigation.navigate("VocabListPage", { userID, vocabHistoryID })}
         >
-          <Text style={styles.vocabListText}>🚀 View Vocab Lists</Text>
+          <Text style={styles.vocabListText}>🚀 View History List</Text>
         </TouchableOpacity>
 
       </View>
